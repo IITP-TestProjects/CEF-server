@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  bc1:
+    container_name: interface-server1
+    image: bcinterface:0.1
+    ports:
+      - 50051:50051
+    networks:
+      - bc_interface
+
+networks:
+  bc_interface:
+    driver: bridge
