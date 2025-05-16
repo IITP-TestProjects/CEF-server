@@ -5,18 +5,18 @@ import (
 	"log"
 	"sync"
 
-	pb "test-sub/proto_interface"
+	pb "test-server/proto_interface"
 )
 
 type meshSrv struct {
 	pb.UnimplementedMeshServer
 	mu   sync.RWMutex
-	subs map[string]chan *pb.CommitteeInfo // 노드ID → 스트림 송신 채널
+	subs map[string]chan *pb.FinalizedCommittee // 노드ID → 스트림 송신 채널
 }
 
 func newMeshSrv() *meshSrv {
 	return &meshSrv{
-		subs: make(map[string]chan *pb.CommitteeInfo),
+		subs: make(map[string]chan *pb.FinalizedCommittee),
 	}
 }
 
@@ -24,7 +24,7 @@ func newMeshSrv() *meshSrv {
 func (m *meshSrv) JoinNetwork(acc *pb.NodeAccount, stream pb.Mesh_JoinNetworkServer) error {
 	nodeID := acc.NodeId
 	//pubKey := acc.PublicKey //=> 차후 Schnorr 구현 시 사용
-	ch := make(chan *pb.CommitteeInfo, 32)
+	ch := make(chan *pb.FinalizedCommittee, 32)
 
 	// 구독자로 등록
 	m.mu.Lock()
@@ -67,7 +67,7 @@ func (m *meshSrv) LeaveNetwork(ctx context.Context, acc *pb.NodeAccount) (*pb.Ac
 }
 
 // ─ fan-out 로직을 별도 함수로 뺌
-func (m *meshSrv) broadcast(msg *pb.CommitteeInfo) {
+func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
 	m.mu.RLock()
 	for _, ch := range m.subs {
 		/* if id == msg.CommitteeList[ch].NodeId { // 필요하면 자기 자신 제외
@@ -82,7 +82,7 @@ func (m *meshSrv) broadcast(msg *pb.CommitteeInfo) {
 }
 
 // RPC에서 호출
-func (m *meshSrv) Publish(_ context.Context, p *pb.CommitteeInfo) (*pb.Ack, error) {
+func (m *meshSrv) Publish(_ context.Context, p *pb.FinalizedCommittee) (*pb.Ack, error) {
 	m.broadcast(p)
 	return &pb.Ack{Ok: true}, nil
 }

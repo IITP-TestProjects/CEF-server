@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"net"
-	pb "test-sub/proto_interface"
+	pb "test-server/proto_interface"
 	"time"
 
 	"google.golang.org/grpc"
@@ -16,9 +16,11 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(10 * time.Second)
-			srv.broadcast(&pb.CommitteeInfo{
-				Origin: "server",
-				Data:   []byte(time.Now().Format(time.RFC3339)),
+			srv.broadcast(&pb.FinalizedCommittee{
+				Round:            1,
+				NodeId:           []string{"node1", "node2", "node3"},
+				AggregatedCommit: []byte("commit-test-data"),
+				AggregatedPubKey: []byte("PublicKey-test-data"),
 			})
 			log.Println("message broadcasted")
 		}
