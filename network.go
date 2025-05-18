@@ -6,7 +6,14 @@ import (
 	"sync"
 
 	pb "test-server/proto_interface"
+
+	"github.com/bford/golang-x-crypto/ed25519"
 )
+
+var recvPartPubKey []ed25519.PublicKey
+
+//network.go에는 grpc RPC구현에 관련된 내용만
+//이외 backend logic은 타 파일에 구현
 
 type meshSrv struct {
 	pb.UnimplementedMeshServer
@@ -85,4 +92,18 @@ func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
 func (m *meshSrv) Publish(_ context.Context, p *pb.FinalizedCommittee) (*pb.Ack, error) {
 	m.broadcast(p)
 	return &pb.Ack{Ok: true}, nil
+}
+
+func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidateInfo) (*pb.Ack, error) {
+	// 노드ID에 해당하는 커밋리스트를 반환
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// 노드ID에 해당하는 커밋리스트를 찾음
+	if nodeId, ok := m.subs[cci.NodeId]; ok {
+		log.Println("node", nodeId, "requested committee")
+		// 커밋리스트를 생성하여 반환
+		return &pb.Ack{Ok: true}, nil
+	}
+	return nil, nil
 }
