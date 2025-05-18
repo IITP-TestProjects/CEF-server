@@ -1,3 +1,5 @@
+github.com/bford/golang-x-crypto v0.0.0-20160518072526-27db609c9d03 h1:xx2iF0IjsICKj3dAv5xK+qiiL2XxgUqNVn442P6Eu+k=
+github.com/bford/golang-x-crypto v0.0.0-20160518072526-27db609c9d03/go.mod h1:EJtJlqu+jyMBrhodO8x5R91nQFv4nsWZP4USkxx3itk=
 github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
 github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=

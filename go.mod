@@ -3,6 +3,7 @@ module test-server
 go 1.23
 
 require (
+	github.com/bford/golang-x-crypto v0.0.0-20160518072526-27db609c9d03
 	google.golang.org/grpc v1.72.1
 	google.golang.org/protobuf v1.36.6
 )
