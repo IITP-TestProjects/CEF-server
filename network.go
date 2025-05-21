@@ -96,7 +96,7 @@ func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidate
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	//cci 데이터를 일일이 저장하고, 4개 노드가 모이면 다음작업을 실행하도록
+	//cci 데이터를 일일이 저장하고, 4개 노드가 모이면 리더 및 커미티 선정하고 반환
 
 	m.appendCandidate(cci)   // 후보자 등록
 	m.tryFinalize(cci.Round) // 4개 모였으면 처리
