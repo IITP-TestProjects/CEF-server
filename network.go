@@ -6,19 +6,16 @@ import (
 	"sync"
 
 	pb "test-server/proto_interface"
-
-	"github.com/bford/golang-x-crypto/ed25519"
 )
 
-var recvPartPubKey []ed25519.PublicKey
-
-//network.go에는 grpc RPC구현에 관련된 내용만
-//이외 backend logic은 타 파일에 구현
-
+// network.go에는 grpc RPC구현에 관련된 내용만
+// 이외 backend-like logic은 타 파일에 구현
 type meshSrv struct {
 	pb.UnimplementedMeshServer
 	mu   sync.RWMutex
 	subs map[string]chan *pb.FinalizedCommittee // 노드ID → 스트림 송신 채널
+
+	committeeCandidates map[uint64][]*pb.CommitteeCandidateInfo // 후보자 정보
 }
 
 func newMeshSrv() *meshSrv {
@@ -88,22 +85,22 @@ func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
 	m.mu.RUnlock()
 }
 
-// RPC에서 호출
+// RPC에서 호출 -> 사실 broadcast가 있으므로 해당 rpc는 굳이 필요없다.
+// 단방향 broadcast만이 필요함.
 func (m *meshSrv) Publish(_ context.Context, p *pb.FinalizedCommittee) (*pb.Ack, error) {
 	m.broadcast(p)
 	return &pb.Ack{Ok: true}, nil
 }
 
 func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidateInfo) (*pb.Ack, error) {
-	// 노드ID에 해당하는 커밋리스트를 반환
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// 노드ID에 해당하는 커밋리스트를 찾음
-	if nodeId, ok := m.subs[cci.NodeId]; ok {
-		log.Println("node", nodeId, "requested committee")
-		// 커밋리스트를 생성하여 반환
-		return &pb.Ack{Ok: true}, nil
-	}
-	return nil, nil
+	//cci 데이터를 일일이 저장하고, 4개 노드가 모이면 다음작업을 실행하도록
+
+	m.appendCandidate(cci)   // 후보자 등록
+	m.tryFinalize(cci.Round) // 4개 모였으면 처리
+	m.gcOldRounds(cci.Round) // GC
+
+	return &pb.Ack{Ok: true}, nil
 }
