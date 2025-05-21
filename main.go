@@ -4,7 +4,6 @@ import (
 	"log"
 	"net"
 	pb "test-server/proto_interface"
-	"time"
 
 	"google.golang.org/grpc"
 )
@@ -13,7 +12,7 @@ func main() {
 	srv := newMeshSrv()
 
 	//테스트용으로 연결된 client에 10초에 한번씩 message broadcast
-	go func() {
+	/* go func() {
 		for {
 			time.Sleep(10 * time.Second)
 			srv.broadcast(&pb.FinalizedCommittee{
@@ -24,7 +23,7 @@ func main() {
 			})
 			log.Println("message broadcasted")
 		}
-	}()
+	}() */
 
 	s := grpc.NewServer()
 	pb.RegisterMeshServer(s, srv)
