@@ -1,9 +1,9 @@
 package main //차후 directory옮기고, package명 logic, tool등으로 변경
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"sync"
 
 	"github.com/bford/golang-x-crypto/ed25519"
 	"github.com/bford/golang-x-crypto/ed25519/cosi"
@@ -15,6 +15,8 @@ const (
 )
 
 var recvPartPubKey []ed25519.PublicKey
+var recvPartCommit []cosi.Commitment
+var mu sync.Mutex
 
 // commit에 필요한 roundHash 값을 생성
 func generateRoundHash(round uint64) []byte {
@@ -25,15 +27,19 @@ func generateRoundHash(round uint64) []byte {
 	return roundHash[:]
 }
 
-func aggregatePubKey(pubKeys []ed25519.PublicKey, round uint64) ([]byte, []byte) {
-	roundHash := generateRoundHash(round)
+func aggregatePubKey(pubKeys []ed25519.PublicKey) ([]byte, []byte) {
+	//roundHash := generateRoundHash(round)
 
 	cosigners := cosi.NewCosigners(pubKeys, nil)
 	commits := []cosi.Commitment{}
 
-	// 차후 클라이언트에서 압축된 서명을 검증할 때도 roundHash값이 필요하다.
+	// 안전을 위해서는 각 client에서 직접 commit을 생성하는게 옳다.
+	// 테스트이므로 nil로 생성한 commitment를 전송
 	for i := 0; i < len(pubKeys); i++ {
-		tempCommit, _, _ := cosi.Commit(bytes.NewReader(roundHash[:]))
+		tempCommit, _, err := cosi.Commit(nil)
+		if err != nil {
+			return nil, nil
+		}
 		commits = append(commits, tempCommit)
 	}
 
@@ -43,5 +49,5 @@ func aggregatePubKey(pubKeys []ed25519.PublicKey, round uint64) ([]byte, []byte)
 	//fmt.Println("Aggregated Public Key: ", aggregatePublicKey)
 	//fmt.Println("Aggregated Commit: ", aggregateCommit)
 
-	return aggregateCommit, aggregatePublicKey
+	return aggregatePublicKey, aggregateCommit
 }
