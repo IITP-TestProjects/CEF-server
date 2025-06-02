@@ -4,9 +4,11 @@ import (
 	"log"
 	pb "test-server/proto_interface"
 
+	"github.com/bford/golang-x-crypto/ed25519"
 	"github.com/bford/golang-x-crypto/ed25519/cosi"
 )
 
+// 후보자정보 등록
 func (m *meshSrv) appendCandidate(cci *pb.CommitteeCandidateInfo) {
 	if m.committeeCandidates == nil {
 		m.committeeCandidates = make(map[uint64][]*pb.CommitteeCandidateInfo)
@@ -25,14 +27,20 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	// MCNL 협의 필요한 부분
 	// selectPrimaryAndCommittee(cands) ...
 
+	var (
+		recvPartPubKey []ed25519.PublicKey
+		recvPartCommit []cosi.Commitment
+		nodeIds        []string
+	)
+
 	// ② 집계 PK·커밋
-	var nodeIds []string
+	//var nodeIds []string
 	for _, c := range cands {
-		mu.Lock()
+		//mu.Lock()
 		recvPartPubKey = append(recvPartPubKey, c.PublicKey)
 		recvPartCommit = append(recvPartCommit, c.Commit)
 		nodeIds = append(nodeIds, c.NodeId)
-		mu.Unlock()
+		//mu.Unlock()
 		log.Printf("recvPartPubKey: %x, recvPartCommit: %x",
 			c.PublicKey, c.Commit)
 	}

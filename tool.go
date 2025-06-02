@@ -3,20 +3,19 @@ package main //차후 directory옮기고, package명 logic, tool등으로 변경
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"sync"
 
 	"github.com/bford/golang-x-crypto/ed25519"
 	"github.com/bford/golang-x-crypto/ed25519/cosi"
 )
 
 const (
-	threshold     = 4 // 커미티 선정 시 threshold
-	gcRoundWindow = 4 // gcRoundWindow: GC를 위한 라운드 윈도우 크기
+	threshold     = 10 // 커미티 선정 시 threshold(노드개수)
+	gcRoundWindow = 4  // gcRoundWindow: GC를 위한 라운드 윈도우 크기
 )
 
-var recvPartPubKey []ed25519.PublicKey
+/* var recvPartPubKey []ed25519.PublicKey
 var recvPartCommit []cosi.Commitment
-var mu sync.Mutex
+var mu sync.Mutex */
 
 // commit에 필요한 roundHash 값을 생성
 func generateRoundHash(round uint64) []byte {

@@ -72,7 +72,7 @@ func (m *meshSrv) LeaveNetwork(ctx context.Context, acc *pb.NodeAccount) (*pb.Ac
 
 // ─ fan-out 로직을 별도 함수로 뺌
 func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
-	m.mu.RLock()
+	//m.mu.RLock() -> tryFinalize에서만 사용되므로, 락 사용시 deadlock발생
 	for _, ch := range m.subs {
 		/* if id == msg.CommitteeList[ch].NodeId { // 필요하면 자기 자신 제외
 			continue
@@ -82,7 +82,7 @@ func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
 		default:
 		}
 	}
-	m.mu.RUnlock()
+	//m.mu.RUnlock()
 }
 
 // RPC에서 호출 -> 사실 broadcast가 있으므로 해당 rpc는 굳이 필요없다.
@@ -93,8 +93,8 @@ func (m *meshSrv) Publish(_ context.Context, p *pb.FinalizedCommittee) (*pb.Ack,
 }
 
 func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidateInfo) (*pb.Ack, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	//cci 데이터를 일일이 저장하고, 4개 노드가 모이면 리더 및 커미티 선정하고 반환
 
