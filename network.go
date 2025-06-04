@@ -115,7 +115,6 @@ func (m *meshSrv) RequestAggregatedCommit(
 	_ context.Context, cd *pb.CommitData) (*pb.Ack, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	log.Println("get Request Aggregate Commit nodenum:", nodeNumber)
 	if m.commitData == nil {
 		m.commitData = make(map[uint64][]*pb.CommitData)
 	}
@@ -141,8 +140,7 @@ func (m *meshSrv) RequestAggregatedCommit(
 		AggregatedCommit: aggCommit,
 	})
 
-	m.commitData[cd.Round] = nil   //
+	m.commitData[cd.Round] = nil
 	delete(m.commitData, cd.Round) // 메모리 절약을 위해 해당 라운드 커미티 정보 초기화
-	log.Println("end Request Aggregate Commit")
 	return &pb.Ack{Ok: true}, nil
 }
