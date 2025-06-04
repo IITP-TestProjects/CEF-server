@@ -8,7 +8,7 @@ import (
 	"github.com/bford/golang-x-crypto/ed25519/cosi"
 )
 
-// 후보자정보 등록
+// 후보자정보 등록 m.mu.Lock()으로 들어온 함수
 func (m *meshSrv) appendCandidate(cci *pb.CommitteeCandidateInfo) {
 	if m.committeeCandidates == nil {
 		m.committeeCandidates = make(map[uint64][]*pb.CommitteeCandidateInfo)
@@ -17,8 +17,12 @@ func (m *meshSrv) appendCandidate(cci *pb.CommitteeCandidateInfo) {
 	m.committeeCandidates[r] = append(m.committeeCandidates[r], cci)
 }
 
+// m.mu.Lock()으로 들어온 함수
 func (m *meshSrv) tryFinalize(round uint64) {
 	cands := m.committeeCandidates[round]
+
+	// 현재는 threshold에 의해 커미티 개수가 결정되지만,
+	// 추후에는 동적인 방식에 의해 candidate를 수집
 	if len(cands) < threshold {
 		return
 	}
@@ -26,6 +30,11 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	// ① metric 기반 위원·프라이머리 선정 (별도 RPC 호출)
 	// MCNL 협의 필요한 부분
 	// selectPrimaryAndCommittee(cands) ...
+	// 커미티 정보를 받았을 때 개수를 전역변수에 저장.
+	nodeMu.Lock()
+	//nodeNumber = len(committees)
+	nodeNumber = threshold // 현재는 threshold로 고정
+	nodeMu.Unlock()
 
 	var (
 		recvPartPubKey []ed25519.PublicKey
@@ -41,7 +50,7 @@ func (m *meshSrv) tryFinalize(round uint64) {
 		recvPartCommit = append(recvPartCommit, c.Commit)
 		nodeIds = append(nodeIds, c.NodeId)
 		//mu.Unlock()
-		log.Printf("recvPartPubKey: %x, recvPartCommit: %x",
+		log.Printf("recvPartPubKey: %x, recvPartCommit: %x || ",
 			c.PublicKey, c.Commit)
 	}
 
@@ -54,11 +63,9 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	log.Println("[pubKeys]:", pubKeys)
 
 	//aggPubKey, aggCommit := aggregatePubKey(recvPartPubKey)
-	cosigners := cosi.NewCosigners(recvPartPubKey, nil)
-	aggPubKey := cosigners.AggregatePublicKey()
-	aggCommit := cosigners.AggregateCommit(recvPartCommit)
-
-	//log.Println("\naggPubKey:", aggPubKey, "\naggCommit", aggCommit)
+	m.cosigners = cosi.NewCosigners(recvPartPubKey, nil)
+	aggPubKey := m.cosigners.AggregatePublicKey()
+	aggCommit := m.cosigners.AggregateCommit(recvPartCommit)
 
 	// ③ 브로드캐스트
 	m.broadcast(&pb.FinalizedCommittee{
@@ -70,9 +77,6 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	})
 
 	delete(m.committeeCandidates, round) // memory free
-	aggPubKey = nil
-	aggCommit = nil
-	recvPartPubKey = nil
 }
 
 func (m *meshSrv) gcOldRounds(cur uint64) {

@@ -13,10 +13,6 @@ const (
 	gcRoundWindow = 4  // gcRoundWindow: GC를 위한 라운드 윈도우 크기
 )
 
-/* var recvPartPubKey []ed25519.PublicKey
-var recvPartCommit []cosi.Commitment
-var mu sync.Mutex */
-
 // commit에 필요한 roundHash 값을 생성
 func generateRoundHash(round uint64) []byte {
 	roundBytes := make([]byte, 8)
