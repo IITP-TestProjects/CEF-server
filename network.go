@@ -34,7 +34,8 @@ func newMeshSrv() *meshSrv {
 }
 
 // JoinNetwork: 클라이언트 → NodeAccount, 서버 → 지속적 Payload 스트림
-func (m *meshSrv) JoinNetwork(acc *pb.NodeAccount, stream pb.Mesh_JoinNetworkServer) error {
+func (m *meshSrv) JoinNetwork(
+	acc *pb.NodeAccount, stream pb.Mesh_JoinNetworkServer) error {
 	nodeID := acc.NodeId
 	//pubKey := acc.PublicKey //=> 차후 Schnorr 구현 시 사용
 	ch := make(chan *pb.FinalizedCommittee, 32)
@@ -84,9 +85,6 @@ func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
 	//m.mu.RLock() -> tryFinalize에서만 사용되므로, 락 사용시 deadlock발생
 	//defer m.mu.RUnlock()
 	for _, ch := range m.subs {
-		/* if id == msg.CommitteeList[ch].NodeId { // 필요하면 자기 자신 제외
-			continue
-		} */
 		select { // 버퍼 풀일 땐 드롭
 		case ch <- msg:
 		default:
