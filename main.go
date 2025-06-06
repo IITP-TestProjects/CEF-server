@@ -11,20 +11,6 @@ import (
 func main() {
 	srv := newMeshSrv()
 
-	//테스트용으로 연결된 client에 10초에 한번씩 message broadcast
-	/* go func() {
-		for {
-			time.Sleep(10 * time.Second)
-			srv.broadcast(&pb.FinalizedCommittee{
-				Round:            1,
-				NodeId:           []string{"node1", "node2", "node3"},
-				AggregatedCommit: []byte("commit-test-data"),
-				AggregatedPubKey: []byte("PublicKey-test-data"),
-			})
-			log.Println("message broadcasted")
-		}
-	}() */
-
 	s := grpc.NewServer()
 	pb.RegisterMeshServer(s, srv)
 
@@ -32,7 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
-	log.Println("Mesh gRPC server :50051 start")
+	log.Println("CEF gRPC server :50051 start")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("serve: %v", err)
 	}

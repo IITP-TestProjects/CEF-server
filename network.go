@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	pb "test-server/proto_interface"
 
@@ -14,8 +15,10 @@ import (
 // 이외 backend-like logic은 타 파일에 구현
 type meshSrv struct {
 	pb.UnimplementedMeshServer
-	mu   sync.RWMutex
-	subs map[string]chan *pb.FinalizedCommittee // 노드ID → 스트림 송신 채널
+	mu        sync.RWMutex
+	subs      map[string]chan *pb.FinalizedCommittee // 노드ID → 스트림 송신 채널
+	processed map[uint64]bool
+	timers    map[uint64]*time.Timer
 
 	committeeCandidates map[uint64][]*pb.CommitteeCandidateInfo // 후보자 정보
 	commitData          map[uint64][]*pb.CommitData             // 커미티 정보
@@ -26,6 +29,8 @@ var (
 	nodeNumber int
 	nodeMu     sync.Mutex // 노드 개수 관리용 뮤텍스
 )
+
+const maxWait = 10 * time.Second
 
 func newMeshSrv() *meshSrv {
 	return &meshSrv{
@@ -100,8 +105,11 @@ func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidate
 	m.cosigners = nil // 새로운 커미티 선정을 시작하므로 cosigners 초기화
 	//cci 데이터를 일일이 저장하고, 10개(현재 고정값) 노드가 모이면 리더 및 커미티 선정하고 반환
 
-	m.appendCandidate(cci)   // 후보자 등록
-	m.tryFinalize(cci.Round) // 4개 모였으면 처리
+	//appendCandidate에서 false가 반환되면 이미 해당 라운드는 종료되었다는 뜻
+	if !m.appendCandidate(cci) {
+		return &pb.Ack{Ok: false}, nil
+	} // 후보자 등록
+	//m.tryFinalize(cci.Round) // 4개 모였으면 처리
 	m.gcOldRounds(cci.Round) // Garbage Collection(window size: gcRoundWindow)
 
 	return &pb.Ack{Ok: true}, nil
@@ -109,6 +117,8 @@ func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidate
 
 // 해당 RPC는 커미티가 선정된 상태에서 서명을 위해 호출되므로,
 // 저장되어 있는 커미티 개수 정보를 불러와 이것을 기반으로 동작하면 된다.
+// 이미 커미티가 설정된 경우, 정해진 개수 이외의 요청이 들어오는 경우 새롭게 커미티 요청을 받아야하므로
+// 이것을 알리는 코드를 추가해야한다.
 func (m *meshSrv) RequestAggregatedCommit(
 	_ context.Context, cd *pb.CommitData) (*pb.Ack, error) {
 	m.mu.Lock()
@@ -116,7 +126,6 @@ func (m *meshSrv) RequestAggregatedCommit(
 	if m.commitData == nil {
 		m.commitData = make(map[uint64][]*pb.CommitData)
 	}
-
 	m.commitData[cd.Round] = append(m.commitData[cd.Round], cd)
 
 	nodeMu.Lock()
