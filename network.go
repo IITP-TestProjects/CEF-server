@@ -43,7 +43,7 @@ func (m *meshSrv) JoinNetwork(
 	acc *pb.NodeAccount, stream pb.Mesh_JoinNetworkServer) error {
 	nodeID := acc.NodeId
 	//pubKey := acc.PublicKey //=> 차후 Schnorr 구현 시 사용
-	ch := make(chan *pb.FinalizedCommittee, 32)
+	ch := make(chan *pb.FinalizedCommittee, 100)
 
 	// 구독자로 등록
 	m.mu.Lock()
@@ -58,6 +58,7 @@ func (m *meshSrv) JoinNetwork(
 		delete(m.subs, nodeID)
 		m.mu.Unlock()
 		close(ch)
+		m.processed = make(map[uint64]bool)
 		log.Printf("node %s left", nodeID)
 	}()
 

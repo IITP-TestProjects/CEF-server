@@ -111,6 +111,7 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	})
 
 	delete(m.committeeCandidates, round) // memory free
+	delete(m.processed, round)
 }
 
 func (m *meshSrv) gcOldRounds(cur uint64) {
