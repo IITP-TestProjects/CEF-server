@@ -8,7 +8,7 @@ import (
 
 	pb "test-server/proto_interface"
 
-	"github.com/bford/golang-x-crypto/ed25519/cosi"
+	"test-server/golang-x-crypto/ed25519/cosi"
 )
 
 // network.go에는 grpc RPC구현에 관련된 내용만

@@ -5,8 +5,8 @@ import (
 	pb "test-server/proto_interface"
 	"time"
 
-	"github.com/bford/golang-x-crypto/ed25519"
-	"github.com/bford/golang-x-crypto/ed25519/cosi"
+	"test-server/golang-x-crypto/ed25519"
+	"test-server/golang-x-crypto/ed25519/cosi"
 )
 
 func (m *meshSrv) initMaps() {
@@ -55,19 +55,12 @@ func (m *meshSrv) tryFinalize(round uint64) {
 
 	cands := m.committeeCandidates[round]
 
-	// 현재는 threshold에 의해 커미티 개수가 결정되지만,
-	// 추후에는 동적인 방식에 의해 candidate를 수집 -> 추가됐으므로 해당방식 패기
-	/* if len(cands) < threshold {
-		return
-	} */
-
 	// ① metric 기반 위원·프라이머리 선정 (별도 RPC 호출)
 	// MCNL 협의 필요한 부분
 	// selectPrimaryAndCommittee(cands) ...
 	// 커미티 정보를 받았을 때 개수를 전역변수에 저장.
 	nodeMu.Lock()
 	nodeNumber = len(cands)
-	//nodeNumber = threshold // 현재는 threshold로 고정
 	nodeMu.Unlock()
 
 	var (

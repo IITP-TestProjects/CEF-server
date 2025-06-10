@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
-	"github.com/bford/golang-x-crypto/ed25519"
-	"github.com/bford/golang-x-crypto/ed25519/cosi"
+	"test-server/golang-x-crypto/ed25519"
+	"test-server/golang-x-crypto/ed25519/cosi"
 )
 
 const (
