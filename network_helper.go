@@ -9,6 +9,8 @@ import (
 	"test-server/golang-x-crypto/ed25519/cosi"
 )
 
+const maxWait = 10 * time.Second
+
 func (m *meshSrv) initMaps() {
 	if m.processed == nil {
 		m.processed = make(map[uint64]bool)
@@ -63,11 +65,36 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	nodeNumber = len(cands)
 	nodeMu.Unlock()
 
+	// 이 지점에서 검증노드에 검증 요청 전송
+	/*===================검증요청 하는 코드===================*/
+	// 해당 코드(의 통신)를 통해 검증완료된 커미티 정보를 수신함
+
 	var (
 		recvPartPubKey []ed25519.PublicKey
 		recvPartCommit []cosi.Commitment
 		nodeIds        []string
 	)
+
+	for _, c := range cands {
+		//cands 중 바로 위에서 수신한 데이터의 nodeId정보가 일치하는 노드만 isCommittee에 true
+		committeeStruct := CommitteeCandidateInfo{
+			Round:       c.Round,
+			NodeId:      c.NodeId,
+			Seed:        c.Seed,
+			Proof:       c.Proof,
+			PublicKey:   c.PublicKey,
+			Commit:      c.Commit,
+			IPAddress:   c.IpAddress,
+			Port:        c.Port,
+			Channel:     c.Channel,
+			IsCommittee: false,
+		}
+		/* receivedNodeId는 매번 바뀔 수 있음.
+		if c.NodeId == receivedNodeId {
+			committeeStruct.isCommittee = true
+		}*/
+		insertNodeInfo(committeeStruct)
+	}
 
 	// ② 집계 PK·커밋
 	//var nodeIds []string

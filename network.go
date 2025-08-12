@@ -6,9 +6,8 @@ import (
 	"sync"
 	"time"
 
-	pb "test-server/proto_interface"
-
 	"test-server/golang-x-crypto/ed25519/cosi"
+	pb "test-server/proto_interface"
 )
 
 // network.go에는 grpc RPC구현에 관련된 내용만
@@ -30,8 +29,6 @@ var (
 	nodeMu     sync.Mutex // 노드 개수 관리용 뮤텍스
 )
 
-const maxWait = 10 * time.Second
-
 func newMeshSrv() *meshSrv {
 	return &meshSrv{
 		subs: make(map[string]chan *pb.FinalizedCommittee),
@@ -39,6 +36,7 @@ func newMeshSrv() *meshSrv {
 }
 
 // JoinNetwork: 클라이언트 → NodeAccount, 서버 → 지속적 Payload 스트림
+// JoinNetwork 데이터 수신할 때, mongoDB사용해서 데이터 추가해야함.
 func (m *meshSrv) JoinNetwork(
 	acc *pb.NodeAccount, stream pb.Mesh_JoinNetworkServer) error {
 	nodeID := acc.NodeId
@@ -100,6 +98,9 @@ func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
 
 // Request Committee 요청을 받는다는 것은: 커미티를 새로 생성해야 한다.
 // -> 커미티의 개수가 바뀐다는 이야기이므로, 저장되어 있던 커미티 개수 정보를 초기화.
+// JoinNetwork와 마찬가지로 mongoDB에 데이터 추가 ->
+// threshold round도달 시 새롭게 커미티 선정요청 들어올 때는 덮어쓰기를 하는게 맞을지...?
+// 아니면 몇회차 커미티 요청~ 식으로 매번 데이터를 append? 하는것이 맞을지?
 func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidateInfo) (*pb.Ack, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

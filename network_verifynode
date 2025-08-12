@@ -1,0 +1,15 @@
+package main
+
+type transferVerifier struct {
+	nodeId      string
+	ipAddress   string
+	portNumber  string
+	publicKey   []byte
+	channelName string
+	vrfSeed     []byte
+	vrfProof    []byte
+}
+
+func subscribeToVerifier() {
+
+}

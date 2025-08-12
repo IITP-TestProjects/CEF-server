@@ -10,6 +10,7 @@ import (
 
 func main() {
 	srv := newMeshSrv()
+	initMongo()
 
 	s := grpc.NewServer()
 	pb.RegisterMeshServer(s, srv)
