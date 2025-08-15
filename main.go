@@ -8,10 +8,15 @@ import (
 	"google.golang.org/grpc"
 )
 
+const verifyServerAddress = "localhost:50052"
+
 func main() {
-	srv := newMeshSrv()
+	//verify server(인천대)연결 클라이언트 인스턴스 생성 및 subscribe
+	verifyClient := initVerifyClient()
+	srv := newMeshSrv(verifyClient)
 	initMongo()
 
+	//CEF 서버 인스턴스 생성
 	s := grpc.NewServer()
 	pb.RegisterMeshServer(s, srv)
 

@@ -8,6 +8,7 @@ import (
 
 	"test-server/golang-x-crypto/ed25519/cosi"
 	pb "test-server/proto_interface"
+	pv "test-server/proto_verify"
 )
 
 // network.go에는 grpc RPC구현에 관련된 내용만
@@ -22,6 +23,8 @@ type meshSrv struct {
 	committeeCandidates map[uint64][]*pb.CommitteeCandidateInfo // 후보자 정보
 	commitData          map[uint64][]*pb.CommitData             // 커미티 정보
 	cosigners           *cosi.Cosigners                         // cosi 집계용, requestCommittee호출 시 반드시 초기화
+
+	verifyCli pv.CommitteeServiceClient // verify server 클라이언트
 }
 
 var (
@@ -29,16 +32,17 @@ var (
 	nodeMu     sync.Mutex // 노드 개수 관리용 뮤텍스
 )
 
-func newMeshSrv() *meshSrv {
+func newMeshSrv(verifyCli pv.CommitteeServiceClient) *meshSrv {
 	return &meshSrv{
-		subs: make(map[string]chan *pb.FinalizedCommittee),
+		subs:      make(map[string]chan *pb.FinalizedCommittee),
+		verifyCli: verifyCli,
 	}
 }
 
 // JoinNetwork: 클라이언트 → NodeAccount, 서버 → 지속적 Payload 스트림
 // JoinNetwork 데이터 수신할 때, mongoDB사용해서 데이터 추가해야함.
 func (m *meshSrv) JoinNetwork(
-	acc *pb.NodeAccount, stream pb.Mesh_JoinNetworkServer) error {
+	acc *pb.CommitteeCandidateInfo, stream pb.Mesh_JoinNetworkServer) error {
 	nodeID := acc.NodeId
 	//pubKey := acc.PublicKey //=> 차후 Schnorr 구현 시 사용
 	ch := make(chan *pb.FinalizedCommittee, 100)
@@ -144,8 +148,11 @@ func (m *meshSrv) RequestAggregatedCommit(
 	}
 
 	aggCommit := m.cosigners.AggregateCommit(recvPartCommit)
+
 	m.broadcast(&pb.FinalizedCommittee{
-		Round:            cd.Round,
+		Round:   cd.Round,
+		Channel: "Audit Chain",
+		//NodeId:           cd.NodeId,
 		AggregatedCommit: aggCommit,
 	})
 

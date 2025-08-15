@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
 	pb "test-server/proto_interface"
+	pv "test-server/proto_verify"
 	"time"
 
 	"test-server/golang-x-crypto/ed25519"
@@ -66,8 +68,12 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	nodeMu.Unlock()
 
 	// 이 지점에서 검증노드에 검증 요청 전송
-	/*===================검증요청 하는 코드===================*/
-	// 해당 코드(의 통신)를 통해 검증완료된 커미티 정보를 수신함
+	m.verifyCli.RequestCommittee(context.Background(),
+		&pv.CommitteeRequest{
+			//내부 데이터는 협의 완료되는대로 구성
+		})
+	// verfyClient로 subscribe한 곳에서 수신함
+	// subscribe 함수 내에서 해당 데이터에 대한 처리필요
 
 	var (
 		recvPartPubKey []ed25519.PublicKey
@@ -75,6 +81,8 @@ func (m *meshSrv) tryFinalize(round uint64) {
 		nodeIds        []string
 	)
 
+	// =====================***====================
+	//차후 아래 내용 subscribe 코드에 통합필요
 	for _, c := range cands {
 		//cands 중 바로 위에서 수신한 데이터의 nodeId정보가 일치하는 노드만 isCommittee에 true
 		committeeStruct := CommitteeCandidateInfo{
@@ -95,6 +103,7 @@ func (m *meshSrv) tryFinalize(round uint64) {
 		}*/
 		insertNodeInfo(committeeStruct)
 	}
+	//================================================
 
 	// ② 집계 PK·커밋
 	//var nodeIds []string
