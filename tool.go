@@ -35,6 +35,13 @@ type CommitteeCandidateInfo struct {
 	//UpdatedAt time.Time `bson:"updatedAt"`
 }
 
+type CommitteeInfo struct {
+	ChannelId string   `bson:"channelId"`
+	LeaderId  string   `bson:"leaderId"`
+	MemberId  []string `bson:"memberId"`
+	Timestamp string   `bson:"timestamp"`
+}
+
 // mongoDB관련 로직 작성
 func activeIndex() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -107,7 +114,17 @@ func insertNodeInfo(info CommitteeCandidateInfo) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	col := connMongo.Database("node_info").Collection("committee_history")
+	col := connMongo.Database("committee_service").Collection("node_history")
+
+	_, err := col.InsertOne(ctx, info)
+	return err
+}
+
+func insertCommitteeInfo(info *CommitteeInfo) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	col := connMongo.Database("committee_service").Collection("committee_history")
 
 	_, err := col.InsertOne(ctx, info)
 	return err

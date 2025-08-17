@@ -24,7 +24,8 @@ type meshSrv struct {
 	commitData          map[uint64][]*pb.CommitData             // 커미티 정보
 	cosigners           *cosi.Cosigners                         // cosi 집계용, requestCommittee호출 시 반드시 초기화
 
-	verifyCli pv.CommitteeServiceClient // verify server 클라이언트
+	verifyCli    pv.CommitteeServiceClient // verify server 클라이언트
+	verifyCommCh map[uint64]chan *pv.CommitteeInfo
 }
 
 var (
@@ -32,10 +33,15 @@ var (
 	nodeMu     sync.Mutex // 노드 개수 관리용 뮤텍스
 )
 
-func newMeshSrv(verifyCli pv.CommitteeServiceClient) *meshSrv {
+var (
+	processingRound uint64 // 현재 committee처리 중인 라운드
+	roundMu         sync.RWMutex
+)
+
+func newMeshSrv( /* verifyCli pv.CommitteeServiceClient */ ) *meshSrv {
 	return &meshSrv{
-		subs:      make(map[string]chan *pb.FinalizedCommittee),
-		verifyCli: verifyCli,
+		subs: make(map[string]chan *pb.FinalizedCommittee),
+		//verifyCli: verifyCli,
 	}
 }
 
@@ -106,8 +112,6 @@ func (m *meshSrv) broadcast(msg *pb.FinalizedCommittee) {
 // threshold round도달 시 새롭게 커미티 선정요청 들어올 때는 덮어쓰기를 하는게 맞을지...?
 // 아니면 몇회차 커미티 요청~ 식으로 매번 데이터를 append? 하는것이 맞을지?
 func (m *meshSrv) RequestCommittee(_ context.Context, cci *pb.CommitteeCandidateInfo) (*pb.Ack, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.cosigners = nil // 새로운 커미티 선정을 시작하므로 cosigners 초기화
 	//cci 데이터를 일일이 저장하고, 10개(현재 고정값) 노드가 모이면 리더 및 커미티 선정하고 반환
 
@@ -149,10 +153,11 @@ func (m *meshSrv) RequestAggregatedCommit(
 
 	aggCommit := m.cosigners.AggregateCommit(recvPartCommit)
 
+	// 커미티 구성 후 매 라운드에서 필요한 최소정보
+	// (round, aggCommit)만 채워서 브로드캐스트
 	m.broadcast(&pb.FinalizedCommittee{
-		Round:   cd.Round,
-		Channel: "Audit Chain",
-		//NodeId:           cd.NodeId,
+		Round: cd.Round,
+		//Channel: "Audit Chain",
 		AggregatedCommit: aggCommit,
 	})
 

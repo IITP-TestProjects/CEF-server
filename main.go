@@ -12,8 +12,9 @@ const verifyServerAddress = "localhost:50052"
 
 func main() {
 	//verify server(인천대)연결 클라이언트 인스턴스 생성 및 subscribe
-	verifyClient := initVerifyClient()
-	srv := newMeshSrv(verifyClient)
+	//verifyClient := initVerifyClient()
+	srv := newMeshSrv( /* verifyClient */ )
+	//srv.subscribe(verifyClient) //verify Node에 subscribe
 	initMongo()
 
 	//CEF 서버 인스턴스 생성
