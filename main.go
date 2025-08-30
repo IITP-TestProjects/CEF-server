@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"net"
 	pb "test-server/proto_interface"
@@ -8,13 +10,22 @@ import (
 	"google.golang.org/grpc"
 )
 
-const verifyServerAddress = "localhost:50052"
-
 func main() {
-	//verify server(인천대)연결 클라이언트 인스턴스 생성 및 subscribe
-	//verifyClient := initVerifyClient()
-	srv := newMeshSrv( /* verifyClient */ )
-	//srv.subscribe(verifyClient) //verify Node에 subscribe
+	verifyServerAddress := flag.String(
+		"verifynode",
+		"0",
+		"CEF requires the address of the verification node (e.g., -verifynode=localhost:50051)",
+	)
+	flag.Parse()
+	if *verifyServerAddress == "0" {
+		fmt.Println("Please provide the address of the verification node (e.g., -verifynode=localhost:50051)")
+		return
+	}
+
+	log.Println("verif server:", *verifyServerAddress)
+	//verify server(인천대)연결 클라이언트 인스턴스 생성
+	verifyClient := initVerifyClient(*verifyServerAddress)
+	srv := newMeshSrv(verifyClient)
 	initMongo()
 
 	//CEF 서버 인스턴스 생성

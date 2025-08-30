@@ -2,88 +2,56 @@ package main
 
 import (
 	"context"
-	"io"
 	"log"
 	pv "test-server/proto_verify"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// CommitteeService.Join을 호출해 서버 스트림을 열고,
-// 별도 goroutine에서 Recv()로 메시지를 계속 수신한다(subscribe).
-func (m *meshSrv) subscribe(c pv.CommitteeServiceClient) error {
-	//Join rpc 관련해서 답변 대기중............
-	stream, err := c.Join(context.Background(),
-		&pv.JoinRequest{
-			NodeId:    "CEF-Server",
-			Addr:      "myIP(CEF)",
-			Port:      "50051",
-			Publickey: "test-public-key",
-		})
-	if err != nil {
-		return err
-	}
+// 현재 구현 상 JoinNetwork사라지며 subscribe 필요없어짐
 
-	go func() {
-		for {
-			msg, err := stream.Recv()
-			if err == io.EOF {
-				log.Println("stream closed")
-				return
-			}
-			if err != nil {
-				return
-			}
-
-			// 검증노드로부터 수신한 커미티정보 DB에 저장
-			err = insertCommitteeInfo(&CommitteeInfo{
-				ChannelId: msg.ChannelId,
-				LeaderId:  msg.LeaderMemberId,
-				MemberId:  msg.MemberIds,
-				Timestamp: msg.Timestamp,
-			})
-			if err != nil {
-				log.Println("Error inserting committee info:", err)
-			}
-
-			nodeMu.Lock()
-			nodeNumber = len(msg.MemberIds)
-			nodeMu.Unlock()
-
-			// 채널로 신호 전송
-			m.mu.Lock()
-			roundMu.RLock()
-			ch, ok := m.verifyCommCh[processingRound]
-			if !ok {
-				ch = make(chan *pv.CommitteeInfo, 1) // 버퍼 1: tryFinalize가 아직 대기 안 해도 누락 방지
-				m.verifyCommCh[processingRound] = ch
-			}
-			roundMu.RUnlock()
-			m.mu.Unlock()
-
-			select {
-			case ch <- msg:
-			default:
-				select {
-				case <-ch:
-				default:
-				}
-				ch <- msg
-			}
-		}
-	}()
-	return nil
-}
-
-func initVerifyClient() pv.CommitteeServiceClient {
-	conn, err := grpc.NewClient(verifyServerAddress,
+func initVerifyClient(verifyNodeAddress string) pv.CommitteeServiceClient {
+	conn, err := grpc.NewClient(verifyNodeAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	conn.Connect()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// 상태 루프: READY가 되면 성공으로 판단
+	for {
+		st := conn.GetState()
+		if st == connectivity.Ready {
+			log.Printf("verify client connected: %s", verifyNodeAddress)
+			break
+		}
+		// 타임아웃 혹은 상태 변화 대기 실패 시 에러 처리
+		if !conn.WaitForStateChange(ctx, st) {
+			_ = conn.Close()
+			log.Fatalf("verify client not ready before timeout (last state=%s, addr=%q)", st.String(), verifyNodeAddress)
+			return nil
+		}
+		// Shutdown으로 떨어지면 즉시 실패
+		if conn.GetState() == connectivity.Shutdown {
+			_ = conn.Close()
+			log.Fatalf("verify client entered Shutdown state (addr=%q)", verifyNodeAddress)
+			return nil
+		}
+	}
+
 	verifyClient := pv.NewCommitteeServiceClient(conn)
+	if verifyClient == nil {
+		log.Println("verifyClient is nil")
+		return nil
+	} else {
+		log.Println("verifyClient initialized (ready)")
+	}
 
 	return verifyClient
 }

@@ -1,5 +1,5 @@
-ARG GO_VER=1.24
-ARG ALPINE_VER=3.20
+ARG GO_VER=1.25
+ARG ALPINE_VER=3.21
 ARG PORT
 
 FROM alpine:${ALPINE_VER} AS peer-base
@@ -23,4 +23,4 @@ RUN go build -o server
 FROM peer-base
 COPY --from=peer /go/src/test_sub /usr/local/bin
 EXPOSE 50051
-CMD ["server"]
+ENTRYPOINT ["server"]

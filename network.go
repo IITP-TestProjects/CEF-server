@@ -33,15 +33,14 @@ var (
 	nodeMu     sync.Mutex // 노드 개수 관리용 뮤텍스
 )
 
-var (
-	processingRound uint64 // 현재 committee처리 중인 라운드
-	roundMu         sync.RWMutex
-)
-
-func newMeshSrv( /* verifyCli pv.CommitteeServiceClient */ ) *meshSrv {
+func newMeshSrv(verifyCli pv.CommitteeServiceClient) *meshSrv {
+	if verifyCli == nil {
+		log.Println("verifyCli is nil")
+		return nil
+	}
 	return &meshSrv{
-		subs: make(map[string]chan *pb.FinalizedCommittee),
-		//verifyCli: verifyCli,
+		subs:      make(map[string]chan *pb.FinalizedCommittee),
+		verifyCli: verifyCli,
 	}
 }
 
@@ -83,7 +82,7 @@ func (m *meshSrv) JoinNetwork(
 	}
 }
 
-// graceful-shutdown을 위한 함수, 탈퇴처리
+// graceful-shutdown을 위한 함수, 탈퇴처리 => 현재 사용하지 않음
 func (m *meshSrv) LeaveNetwork(ctx context.Context, acc *pb.NodeAccount) (*pb.Ack, error) {
 	m.mu.Lock()
 	if ch, ok := m.subs[acc.NodeId]; ok {

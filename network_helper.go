@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	pb "test-server/proto_interface"
 	pv "test-server/proto_verify"
@@ -70,7 +71,7 @@ func (m *meshSrv) appendCandidate(cci *pb.CommitteeCandidateInfo) bool {
 	if _, ok := m.timers[r]; !ok {
 		m.timers[r] = time.AfterFunc(maxWait, func() {
 			log.Println("timeout! begin to make commmittee!")
-			m.tryFinalize(r)
+			m.finalizeCommitteeSelection(r)
 		})
 	}
 
@@ -83,13 +84,76 @@ func (m *meshSrv) appendCandidate(cci *pb.CommitteeCandidateInfo) bool {
 	m.mu.Unlock()
 
 	if reached {
-		go m.tryFinalize(r)
+		go m.finalizeCommitteeSelection(r)
 	}
 	return true
 }
 
-// m.mu.Lock()으로 들어온 함수
-func (m *meshSrv) tryFinalize(round uint64) {
+func (m *meshSrv) buildVerifyRequestData(cands []*pb.CommitteeCandidateInfo) []*pv.CommitteeCandidates {
+	candidateGroup := make([]*pv.CommitteeCandidates, 0)
+	for _, data := range cands {
+		CandidateNodeData := &pv.CommitteeCandidates{
+			NodeId:    data.NodeId,
+			Addr:      data.IpAddress,
+			Port:      data.Port,
+			Publickey: data.PublicKey,
+			Seed:      data.Seed,
+			Proof:     data.Proof,
+		}
+		candidateGroup = append(candidateGroup, CandidateNodeData)
+	}
+	return candidateGroup
+}
+
+func (m *meshSrv) aggregateKeyAndCommits(local *[]*pb.CommitteeCandidateInfo) ([][]byte, ed25519.PublicKey, cosi.Commitment) {
+	var (
+		recvPartPubKey []ed25519.PublicKey
+		recvPartCommit []cosi.Commitment
+		//pubKeys        [][]byte
+	)
+
+	for _, c := range *local {
+		recvPartPubKey = append(recvPartPubKey, c.PublicKey)
+		recvPartCommit = append(recvPartCommit, c.Commit)
+		//nodeIds = append(nodeIds, c.NodeId)
+		log.Printf("recvPartPubKey: %x, recvPartCommit: %x || ",
+			c.PublicKey, c.Commit)
+	}
+
+	var pubKeys [][]byte
+	for _, pk := range recvPartPubKey {
+		pubKeys = append(pubKeys, pk)
+	}
+	log.Println("[recvPartPubKey]:", recvPartPubKey)
+	log.Println("[recvPartCommit]:", recvPartCommit)
+	log.Println("[pubKeys]:", pubKeys)
+
+	m.mu.Lock()
+	m.cosigners = cosi.NewCosigners(recvPartPubKey, nil)
+	m.mu.Unlock()
+	aggPubKey := m.cosigners.AggregatePublicKey()
+	aggCommit := m.cosigners.AggregateCommit(recvPartCommit)
+
+	return pubKeys, aggPubKey, aggCommit
+}
+
+func deleteExceptCommittee(local *[]*pb.CommitteeCandidateInfo, vmsg *pv.CommitteeInfo) {
+	validNodeIds := make(map[string]struct{})
+	for _, id := range vmsg.MemberIds {
+		validNodeIds[id] = struct{}{}
+	}
+
+	filteredLocal := make([]*pb.CommitteeCandidateInfo, 0, len(*local))
+
+	for _, candidate := range *local {
+		if _, ok := validNodeIds[candidate.NodeId]; ok {
+			filteredLocal = append(filteredLocal, candidate)
+		}
+	}
+	*local = filteredLocal
+}
+
+func (m *meshSrv) finalizeCommitteeSelection(round uint64) {
 	m.mu.Lock()
 	if m.processed[round] {
 		m.mu.Unlock()
@@ -109,84 +173,42 @@ func (m *meshSrv) tryFinalize(round uint64) {
 	delete(m.committeeCandidates, round) // memory free
 	m.mu.Unlock()
 
-	/* roundMu.Lock()
-	processingRound = round
-	roundMu.Unlock() */
+	insertCandidateNodes(local)                       // 후보자 정보 DB에 저장
+	candidateGroup := m.buildVerifyRequestData(local) // 검증 요청에 필요한 데이터 빌드
 
-	insertCandidateNodes(local) // 후보자 정보 DB에 저장
-
-	// 이 지점에서 검증노드에 검증 요청 전송
-	// verfyClient로 subscribe한 곳에서 수신함
-	/* m.verifyCli.RequestCommittee(context.Background(),
-	&pv.CommitteeRequest{
-		//내부 데이터는 협의 완려되는대로 구성
-	}) */
-
-	// ① metric 기반 위원·프라이머리 선정 (별도 RPC 호출)
-	// MCNL 협의 필요한 부분
-	// selectPrimaryAndCommittee(cands) ...
-
-	var (
-		recvPartPubKey []ed25519.PublicKey
-		recvPartCommit []cosi.Commitment
-		nodeIds        []string //앞으로 노드 아이디를 verify node로부터 받아옴
-	)
-
-	// ② 집계 PK·커밋
-	//var nodeIds []string
-	for _, c := range local {
-		//mu.Lock()
-		recvPartPubKey = append(recvPartPubKey, c.PublicKey)
-		recvPartCommit = append(recvPartCommit, c.Commit)
-		nodeIds = append(nodeIds, c.NodeId)
-		//mu.Unlock()
-		log.Printf("recvPartPubKey: %x, recvPartCommit: %x || ",
-			c.PublicKey, c.Commit)
+	// ① 커미티 및 리더노드 선정(검증노드에 커미티 생성 요청)
+	log.Println("Requesting committee selection to verify node...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	vmsg, err := m.verifyCli.RequestCommittee(ctx,
+		&pv.CommitteeRequest{
+			Candidates: candidateGroup,
+			Channel:    local[0].Channel, //어쨋든 candidate node들은 동일한 채널에 대해 요청함
+		})
+	if err != nil {
+		log.Println("verifyCli.RequestCommittee error:", err)
 	}
 
-	var pubKeys [][]byte
-	for _, pk := range recvPartPubKey {
-		pubKeys = append(pubKeys, pk)
+	if vmsg == nil {
+		log.Println("nothing vmsg")
 	}
-	log.Println("[recvPartPubKey]:", recvPartPubKey)
-	log.Println("[recvPartCommit]:", recvPartCommit)
-	log.Println("[pubKeys]:", pubKeys)
 
-	//aggPubKey, aggCommit := aggregatePubKey(recvPartPubKey)
-	m.mu.Lock()
-	m.cosigners = cosi.NewCosigners(recvPartPubKey, nil)
-	m.mu.Unlock()
-	aggPubKey := m.cosigners.AggregatePublicKey()
-	aggCommit := m.cosigners.AggregateCommit(recvPartCommit)
+	//local 중 vmsg에서 선택되지 않은 데이터들은 모두 삭제처리
+	deleteExceptCommittee(&local, vmsg)
+
+	//압축에 필요한 데이터 생성.
+	pubKeys, aggPubKey, aggCommit := m.aggregateKeyAndCommits(&local)
 
 	nodeMu.Lock()
-	nodeNumber = len(nodeIds)
+	nodeNumber = len(vmsg.MemberIds) //이후 RequestAggregatedCommit에 필요한 데이터
 	nodeMu.Unlock()
 
-	/* m.mu.Lock()
-	ch, ok := m.verifyCommCh[processingRound]
-	if !ok {
-		ch = make(chan *pv.CommitteeInfo, 1)
-		m.verifyCommCh[processingRound] = ch
-	}
-	m.mu.Unlock()
-
-	var vmsg *pv.CommitteeInfo
-	select {
-	case vmsg = <-ch:
-		// vmsg 내용으로 cands 표식/선정 등 반영
-		// ex) vmsg.MemberIds 를 기반으로 cands 안 isCommittee 설정
-	case <-time.After(5 * time.Second):
-		// 응답이 늦으면 없이 진행 (정책에 따라 재시도/로그)
-		log.Println("verify response timeout: proceed without it")
-	} */
-
-	// ③ 브로드캐스트
+	// ③ 블록체인 노드 측으로 브로드캐스트
 	m.broadcast(&pb.FinalizedCommittee{
-		Round: round,
-		//NodeId:           vmsg.MemberIds,
-		//LeaderNodeId:     vmsg.LeaderMemberId,
-		NodeId:           nodeIds,
+		Round:            round,
+		Channel:          local[0].Channel,
+		NodeId:           vmsg.MemberIds,
+		LeaderNodeId:     vmsg.LeaderMemberId,
 		AggregatedCommit: aggCommit,
 		AggregatedPubKey: aggPubKey,
 		PublicKeys:       pubKeys,

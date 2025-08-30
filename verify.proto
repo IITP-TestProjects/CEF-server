@@ -9,12 +9,12 @@ service CommitteeService {
 }
 
 // Join 요청
-message JoinRequest {
+/* message JoinRequest {
   string node_id = 1;            // 참여 노드의 고유 ID
   string addr = 2;               // 네트워크 주소
   string port = 3;               // 노드 리스닝 포트
   string publickey = 4;          // 노드 공개키         
-}
+} */
 
 // 커미티 정보 (Join 이후 스트리밍으로 내려옴)
 message CommitteeInfo {
@@ -31,10 +31,10 @@ message CommitteeRequest {
 }
 
 message CommitteeCandidates {
-  repeated string node_id = 1;            // 참여 노드의 고유 ID
-  repeated string addr = 2;               // 네트워크 주소
-  repeated string port = 3;               // 노드 리스닝 포트
-  repeated string publickey = 4;          // 노드 공개키
-  repeated bytes seed = 5;                // VRF에 사용되는 seed
-  repeated bytes proof = 6;               // 본인의 proof
+  string node_id = 1;      // 참여 노드의 고유 ID
+  string addr = 2;         // 네트워크 주소
+  string port = 3;         // 노드 리스닝 포트
+  bytes  publickey = 4;    // 노드 공개키
+  string seed = 5;         // VRF에 사용되는 seed
+  bytes  proof = 6;        // 본인의 proof
 }
