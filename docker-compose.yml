@@ -9,8 +9,10 @@ services:
     command: ["-verifynode=verify-server1:50053"]
     depends_on:
       - mongo1
+      - mongo2
+      - mongo3
     networks:
-      - test-verifier_bc_interface
+      - test-verifynode_bc_interface
 
   mongo1:
     container_name: mongo1
@@ -30,7 +32,7 @@ services:
       #- ~/data/mongo:/data/db
       #- mongo1_data:/data/db
     networks:
-      - test-verifier_bc_interface
+      - test-verifynode_bc_interface
 
   mongo2:
     container_name: mongo2
@@ -50,7 +52,7 @@ services:
       #- ~/data/mongo:/data/db
       #- mongo2_data:/data/db
     networks:
-      - test-verifier_bc_interface
+      - test-verifynode_bc_interface
 
   mongo3:
     container_name: mongo3
@@ -70,8 +72,8 @@ services:
       #- ~/data/mongo:/data/db
       #- mongo3_data:/data/db
     networks:
-      - test-verifier_bc_interface
+      - test-verifynode_bc_interface
 
 networks:
-  test-verifier_bc_interface:
+  test-verifynode_bc_interface:
     external: true

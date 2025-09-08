@@ -66,6 +66,7 @@ func (m *meshSrv) JoinNetwork(
 		m.mu.Unlock()
 		close(ch)
 		m.processed = make(map[uint64]bool)
+		clear(m.commitData)
 		log.Printf("node %s left", nodeID)
 	}()
 
