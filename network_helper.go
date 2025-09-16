@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"log"
+	"sort"
 	pb "test-server/proto_interface"
 	pv "test-server/proto_verify"
 	"time"
@@ -137,6 +140,28 @@ func (m *meshSrv) aggregateKeyAndCommits(local *[]*pb.CommitteeCandidateInfo) ([
 	return pubKeys, aggPubKey, aggCommit
 }
 
+// rosterHash computes a canonical hash of the committee's public keys.
+// The input ordering MUST be the canonical committee order used by clients.
+// Hash = SHA-256(concat(pubkey_i_bytes))
+func rosterHash(pubKeys [][]byte) []byte {
+	if len(pubKeys) == 0 {
+		return nil
+	}
+	// 사전순 정렬을 위해 복사본 배열 생성
+	arr := make([][]byte, 0, len(pubKeys))
+	for _, pk := range pubKeys {
+		b := make([]byte, len(pk))
+		copy(b, pk)
+		arr = append(arr, b)
+	}
+	sort.Slice(arr, func(i, j int) bool { return bytes.Compare(arr[i], arr[j]) < 0 })
+	h := sha256.New()
+	for _, b := range arr {
+		h.Write(b)
+	}
+	return h.Sum(nil)
+}
+
 func deleteExceptCommittee(local *[]*pb.CommitteeCandidateInfo, vmsg *pv.CommitteeInfo) {
 	validNodeIds := make(map[string]struct{})
 	for _, id := range vmsg.MemberIds {
@@ -191,6 +216,7 @@ func (m *meshSrv) finalizeCommitteeSelection(round uint64) {
 
 	if vmsg == nil {
 		log.Println("nothing vmsg")
+		return
 	}
 
 	//local 중 vmsg에서 선택되지 않은 데이터들은 모두 삭제처리
@@ -198,6 +224,10 @@ func (m *meshSrv) finalizeCommitteeSelection(round uint64) {
 
 	//압축에 필요한 데이터 생성.
 	pubKeys, aggPubKey, aggCommit := m.aggregateKeyAndCommits(&local)
+
+	// Compute roster hash for the finalized committee (for audit/binding)
+	rHash := rosterHash(pubKeys)
+	//log.Printf("RosterHash (SHA-256): %x", rHash)
 
 	nodeMu.Lock()
 	nodeNumber = len(vmsg.MemberIds) //이후 RequestAggregatedCommit에 필요한 데이터
@@ -212,6 +242,7 @@ func (m *meshSrv) finalizeCommitteeSelection(round uint64) {
 		AggregatedCommit: aggCommit,
 		AggregatedPubKey: aggPubKey,
 		PublicKeys:       pubKeys,
+		RosterHash:       rHash,
 	})
 
 	m.mu.Lock()
