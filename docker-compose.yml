@@ -12,7 +12,7 @@ services:
       - mongo2
       - mongo3
     networks:
-      - test-verifier_bc_interface
+      - bc_interface
 
   mongo1:
     container_name: mongo1
@@ -32,7 +32,7 @@ services:
       #- ~/data/mongo:/data/db
       #- mongo1_data:/data/db
     networks:
-      - test-verifier_bc_interface
+      - bc_interface
 
   mongo2:
     container_name: mongo2
@@ -41,7 +41,7 @@ services:
     command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27018", "--keyFile", "/etc/mongodb/pki/keyfile"]
     restart: always
     ports:
-      - 27018:27017
+      - 27018:27018
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=root
@@ -52,7 +52,7 @@ services:
       #- ~/data/mongo:/data/db
       #- mongo2_data:/data/db
     networks:
-      - test-verifier_bc_interface
+      - bc_interface
 
   mongo3:
     container_name: mongo3
@@ -61,7 +61,7 @@ services:
     command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27019", "--keyFile", "/etc/mongodb/pki/keyfile"]
     restart: always
     ports:
-      - 27019:27017
+      - 27019:27019
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=root
@@ -72,8 +72,8 @@ services:
       #- ~/data/mongo:/data/db
       #- mongo3_data:/data/db
     networks:
-      - test-verifier_bc_interface
+      - bc_interface
 
 networks:
-  test-verifier_bc_interface:
-    external: true
+  bc_interface:
+    driver: bridge
